@@ -95,8 +95,11 @@ export declare class ChatsController {
         messageCount: number;
     }>;
     listRoomUsers(roomId: string): Promise<import("mongoose").Types.ObjectId[]>;
-    inviteUserToRoom(roomId: string, userId: string): Promise<"user invitation sent!" | {
-        message: string;
+    inviteListOfUsersToRoom(roomId: string, usersId: string[]): Promise<{
+        invited: string[];
+        alreadyInvited: string[];
+        notFound: string[];
+        invalidIds: string[];
     }>;
     joinRoomRequest(roomId: string, req: any): Promise<string>;
     acceptInvitation(roomId: string, userId: string): Promise<{

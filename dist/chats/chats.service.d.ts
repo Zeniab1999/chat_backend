@@ -154,8 +154,11 @@ export declare class ChatsService {
     } & Required<{
         _id: Types.ObjectId;
     }>)[]>;
-    inviteUserToRoom(roomId: string, userId: string): Promise<"user invitation sent!" | {
-        message: string;
+    inviteUsersToRoom(roomId: string, usersId: string[]): Promise<{
+        invited: string[];
+        alreadyInvited: string[];
+        notFound: string[];
+        invalidIds: string[];
     }>;
     createRoomInvitation(roomId: string, userId: string): Promise<string>;
     acceptRoomInvitation(userId: string, roomId: string): Promise<{

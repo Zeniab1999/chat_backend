@@ -66,8 +66,8 @@ let ChatsController = class ChatsController {
     listRoomUsers(roomId) {
         return this.chatsService.listRoomUsers(roomId);
     }
-    inviteUserToRoom(roomId, userId) {
-        return this.chatsService.inviteUserToRoom(roomId, userId);
+    inviteListOfUsersToRoom(roomId, usersId) {
+        return this.chatsService.inviteUsersToRoom(roomId, usersId);
     }
     async joinRoomRequest(roomId, req) {
         const userId = req.user._id;
@@ -204,11 +204,11 @@ __decorate([
     (0, roles_decorator_1.Roles)(roles_enums_1.Role.Admin, roles_enums_1.Role.Manager),
     (0, common_1.Post)('room/inviteToRoom'),
     __param(0, (0, common_1.Query)('roomId')),
-    __param(1, (0, common_1.Body)('userId')),
+    __param(1, (0, common_1.Body)('usersId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, Array]),
     __metadata("design:returntype", void 0)
-], ChatsController.prototype, "inviteUserToRoom", null);
+], ChatsController.prototype, "inviteListOfUsersToRoom", null);
 __decorate([
     (0, common_1.Get)('room/joinRoomRequest'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

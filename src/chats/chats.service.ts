@@ -360,40 +360,63 @@ export class ChatsService {
   }
 
   ////////////////////////////////////////////////////// Invatation start //////////////////////////////////////////////////////////
-  async inviteUserToRoom(roomId: string, userId: string) {
-    if (!Types.ObjectId.isValid(roomId)) {
-      throw new NotFoundException('Invalid room ID');
-    }
-    if (!Types.ObjectId.isValid(userId)) {
-      throw new NotFoundException('Invalid user ID');
-    }
-    // 3. Find the user to ensure they exist
-    const user = await this.userDocument.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found.');
-    }
-    const inviteUrl = `http://localhost:3000/chats/room/inviteAccept?roomId=${roomId}&userId=${userId}`;
-
-    // 4. Check if the user is already invited
-    const isInvited = user.invitations.some(
-      (inviteUrl) => inviteUrl === inviteUrl,
-    );
-
-    if (isInvited) {
-      return {
-        message: 'User is already invited.',
-      };
-    } else {
-      await this.userDocument
-        .findByIdAndUpdate(userId, {
-          $push: { invitations: inviteUrl },
-        })
-        .exec();
-    }
-
-    // const qrCodeDataUrl = await QRCode.toDataURL(inviteUrl);
-    return 'user invitation sent!';
+ async inviteUsersToRoom(roomId: string, usersId: string[]) {
+  if (!Types.ObjectId.isValid(roomId)) {
+    throw new NotFoundException('Invalid room ID');
   }
+  if (!Array.isArray(usersId) || usersId.length === 0) {
+    throw new BadRequestException('usersId must be a non-empty array');
+  }
+
+  // Validate user ids
+  const invalidIds: string[] = [];
+  const validIds: string[] = [];
+  for (const id of usersId) {
+    (Types.ObjectId.isValid(id) ? validIds : invalidIds).push(id);
+  }
+  if (validIds.length === 0) {
+    return { invited: [], alreadyInvited: [], notFound: [], invalidIds };
+  }
+
+  // Fetch users (only needed fields)
+  const users = await this.userDocument
+    .find({ _id: { $in: validIds } }, { _id: 1, invitations: 1 })
+    .lean();
+
+  const foundSet = new Set(users.map(u => String(u._id)));
+  const notFound = validIds.filter(id => !foundSet.has(id));
+
+  const baseUrl = process.env.APP_URL ?? 'http://localhost:3000';
+  const invited: string[] = [];
+  const alreadyInvited: string[] = [];
+  const bulkOps: any[] = [];
+
+  for (const u of users) {
+    const uid = String(u._id);
+    const inviteUrl = `${baseUrl}/chats/room/inviteAccept?roomId=${roomId}&userId=${uid}`;
+
+    const existing = (u.invitations ?? []) as string[];
+    if (existing.includes(inviteUrl)) {
+      alreadyInvited.push(uid);
+      continue;
+    }
+
+    invited.push(uid);
+    bulkOps.push({
+      updateOne: {
+        filter: { _id: u._id },
+        update: { $addToSet: { invitations: inviteUrl } }, // idempotent
+      },
+    });
+  }
+
+  if (bulkOps.length) {
+    await this.userDocument.bulkWrite(bulkOps);
+  }
+
+  return { invited, alreadyInvited, notFound, invalidIds };
+}
+
   async createRoomInvitation(roomId: string, userId: string) {
     if (!Types.ObjectId.isValid(roomId)) {
       throw new NotFoundException('Invalid room ID');

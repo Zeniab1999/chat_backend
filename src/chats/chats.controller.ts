@@ -138,11 +138,11 @@ export class ChatsController {
   @UseGuards(JwtAuthGuard)
   @Roles(Role.Admin, Role.Manager)
   @Post('room/inviteToRoom')
-  inviteUserToRoom(
+  inviteListOfUsersToRoom(
     @Query('roomId') roomId: string,
-    @Body('userId') userId: string,
+    @Body('usersId') usersId:  string[]
   ) {
-    return this.chatsService.inviteUserToRoom(roomId, userId);
+    return this.chatsService.inviteUsersToRoom(roomId, usersId);
   }
 
   @Get('room/joinRoomRequest')

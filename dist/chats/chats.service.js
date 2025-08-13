@@ -307,32 +307,50 @@ let ChatsService = class ChatsService {
             throw new common_1.InternalServerErrorException('Failed to get room messages');
         }
     }
-    async inviteUserToRoom(roomId, userId) {
+    async inviteUsersToRoom(roomId, usersId) {
         if (!mongoose_2.Types.ObjectId.isValid(roomId)) {
             throw new common_1.NotFoundException('Invalid room ID');
         }
-        if (!mongoose_2.Types.ObjectId.isValid(userId)) {
-            throw new common_1.NotFoundException('Invalid user ID');
+        if (!Array.isArray(usersId) || usersId.length === 0) {
+            throw new common_1.BadRequestException('usersId must be a non-empty array');
         }
-        const user = await this.userDocument.findById(userId);
-        if (!user) {
-            throw new common_1.NotFoundException('User not found.');
+        const invalidIds = [];
+        const validIds = [];
+        for (const id of usersId) {
+            (mongoose_2.Types.ObjectId.isValid(id) ? validIds : invalidIds).push(id);
         }
-        const inviteUrl = `http://localhost:3000/chats/room/inviteAccept?roomId=${roomId}&userId=${userId}`;
-        const isInvited = user.invitations.some((inviteUrl) => inviteUrl === inviteUrl);
-        if (isInvited) {
-            return {
-                message: 'User is already invited.',
-            };
+        if (validIds.length === 0) {
+            return { invited: [], alreadyInvited: [], notFound: [], invalidIds };
         }
-        else {
-            await this.userDocument
-                .findByIdAndUpdate(userId, {
-                $push: { invitations: inviteUrl },
-            })
-                .exec();
+        const users = await this.userDocument
+            .find({ _id: { $in: validIds } }, { _id: 1, invitations: 1 })
+            .lean();
+        const foundSet = new Set(users.map(u => String(u._id)));
+        const notFound = validIds.filter(id => !foundSet.has(id));
+        const baseUrl = process.env.APP_URL ?? 'http://localhost:3000';
+        const invited = [];
+        const alreadyInvited = [];
+        const bulkOps = [];
+        for (const u of users) {
+            const uid = String(u._id);
+            const inviteUrl = `${baseUrl}/chats/room/inviteAccept?roomId=${roomId}&userId=${uid}`;
+            const existing = (u.invitations ?? []);
+            if (existing.includes(inviteUrl)) {
+                alreadyInvited.push(uid);
+                continue;
+            }
+            invited.push(uid);
+            bulkOps.push({
+                updateOne: {
+                    filter: { _id: u._id },
+                    update: { $addToSet: { invitations: inviteUrl } },
+                },
+            });
         }
-        return 'user invitation sent!';
+        if (bulkOps.length) {
+            await this.userDocument.bulkWrite(bulkOps);
+        }
+        return { invited, alreadyInvited, notFound, invalidIds };
     }
     async createRoomInvitation(roomId, userId) {
         if (!mongoose_2.Types.ObjectId.isValid(roomId)) {
